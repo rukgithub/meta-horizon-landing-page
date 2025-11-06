@@ -2,28 +2,110 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Meta Horizon Gallery</title>
+  <title>Meta Horizon Gallery - Universe Tour</title>
+  <!-- A-Frame library -->
   <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
 </head>
 <body>
-  <!-- A-Frame scene for Meta Horizon VR gallery -->
+  <!-- Main scene for VR gallery -->
   <a-scene background="color: #000000">
+    <!-- Assets: load the same image for all placeholders -->
     <a-assets>
-      <!-- Placeholder images; replace with your own images in the images folder -->
       <img id="img1" src="velkommen.png">
-      <!-- Add more images as needed -->
     </a-assets>
 
-    <!-- Create sky/environment -->
-    <a-sky color="#000000"></a-sky>
+    <!-- Star field component definition -->
+    <script>
+      // Create a simple star field by adding spheres at random positions.
+      AFRAME.registerComponent('star-field', {
+        init: function () {
+          const sceneEl = this.el;
+          const count = 200;
+          for (let i = 0; i < count; i++) {
+            const star = document.createElement('a-sphere');
+            const space = 60;
+            const x = (Math.random() - 0.5) * space;
+            const y = (Math.random() - 0.5) * space;
+            const z = (Math.random() - 0.5) * space;
+            star.setAttribute('position', {x: x, y: y, z: z});
+            const size = Math.random() * 0.15 + 0.02;
+            star.setAttribute('radius', size);
+            star.setAttribute('material', {color: '#FFFFFF', shader: 'flat', opacity: 0.8});
+            sceneEl.appendChild(star);
+          }
+        }
+      });
 
-    <!-- Display images on planes positioned around the user -->
-    <a-plane src="#img1" position="-2 1.5 -3" rotation="0 15 0" width="2" height="1.5"></a-plane>
-    <a-plane src="#img2" position="2 1.5 -3" rotation="0 -15 0" width="2" height="1.5"></a-plane>
-    <!-- Duplicate the pattern above with additional images if needed -->
+      // Component to create twelve image planes around a circle and add click interaction.
+      AFRAME.registerComponent('gallery-setup', {
+        init: function () {
+          const sceneEl = this.el;
+          const total = 12;
+          const radius = 8;
+          for (let i = 0; i < total; i++) {
+            const angle = (i / total) * Math.PI * 2;
+            const x = radius * Math.sin(angle);
+            const z = radius * Math.cos(angle);
+            const y = 1.5;
+            const plane = document.createElement('a-plane');
+            plane.setAttribute('position', {x: x, y: y, z: z});
+            // Rotate the plane to face the center.
+            const rotationY = -angle * 180 / Math.PI + 180;
+            plane.setAttribute('rotation', {x: 0, y: rotationY, z: 0});
+            plane.setAttribute('width', 4);
+            plane.setAttribute('height', 3);
+            plane.setAttribute('material', {src: '#img1', side: 'double', transparent: false});
+            plane.classList.add('clickable');
+            // Simple click interaction: briefly scale image when clicked.
+            plane.addEventListener('click', function () {
+              plane.emit('scaleup');
+            });
+            plane.setAttribute('animation__scaleup', {
+              property: 'scale',
+              startEvents: 'scaleup',
+              to: '1.3 1.3 1.3',
+              dur: 200,
+              easing: 'easeOutQuad',
+              dir: 'alternate'
+            });
+            sceneEl.appendChild(plane);
+          }
+        }
+      });
+    </script>
 
-    <!-- Camera and controls allow the user to look around -->
-    <a-entity camera look-controls position="0 1.6 0"></a-entity>
+    <!-- Add the star field to the scene -->
+    <a-entity star-field></a-entity>
+
+    <!-- Add a simple planet -->
+    <a-sphere position="0 3 -15" radius="3" color="#88c0ff" material="shader: standard; roughness: 0.8;"></a-sphere>
+
+    <!-- Shooting star: animated small sphere that moves across the sky -->
+    <a-sphere id="shootingStar" position="-10 6 -20" radius="0.15" color="#ffffff"></a-sphere>
+    <a-animation
+      attribute="position"
+      dur="7000"
+      fill="forwards"
+      repeat="indefinite"
+      easing="linear"
+      to="10 8 -30"
+      direction="alternate"
+      ></a-animation>
+
+    <!-- Set up the gallery with 12 placeholders -->
+    <a-entity gallery-setup></a-entity>
+
+    <!-- Camera rig: includes camera, controls, and cursor -->
+    <a-entity id="cameraRig" position="0 1.6 0">
+      <a-entity
+        camera
+        look-controls
+        wasd-controls
+        raycaster="objects: .clickable"
+        cursor="rayOrigin: mouse; fuse: false; maxDistance: 50"
+        >
+      </a-entity>
+    </a-entity>
   </a-scene>
 </body>
 </html>
