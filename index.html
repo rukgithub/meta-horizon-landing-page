@@ -71,21 +71,36 @@
   });
 
   /* --------- Emissive stjerne-sfærer for dybde -------- */
+  // Stars are rendered as emissive spheres scattered around the scene.  The
+  // original implementation assigned each star a random twinkle speed and
+  // target intensity, which resulted in a distracting "flickering" effect.
+  // To create a calmer, more uniform star field, each star now starts at a
+  // moderate emissive intensity and gently brightens before dimming back to
+  // the base value.  Twinkle durations are longer (5–8 seconds) to produce
+  // a subtle shimmer rather than rapid flashes.
   AFRAME.registerComponent('star-spheres', {
     schema: {count:{default: 600}, spread:{default: 160}},
     init: function(){
-      const spread = this.data.spread, root = this.el;
-      for (let i=0;i<this.data.count;i++){
+      const spread = this.data.spread;
+      const root   = this.el;
+      for (let i = 0; i < this.data.count; i++) {
         const s = document.createElement('a-sphere');
-        const x=(Math.random()-0.5)*spread;
-        const y=(Math.random()-0.3)*spread*0.7 + 8; // bias over horisonten
-        const z=(Math.random()-0.5)*spread;
-        const r = Math.random()*0.12 + 0.01;
-        s.setAttribute('position',`${x} ${y} ${z}`);
+        // Random position within a cube around the origin.  Y is biased upward
+        // to keep most stars above the horizon line.
+        const x = (Math.random() - 0.5) * spread;
+        const y = (Math.random() - 0.3) * spread * 0.7 + 8;
+        const z = (Math.random() - 0.5) * spread;
+        const r = Math.random() * 0.12 + 0.01;
+        s.setAttribute('position', `${x} ${y} ${z}`);
         s.setAttribute('radius', r);
-        s.setAttribute('material','color:#fff; emissive:#fff; emissiveIntensity:0.35; shader:standard; fog:false');
+        // Base emissive intensity is lower to reduce brightness.  The star
+        // gradually brightens to a slightly higher intensity and then dims.
+        const baseIntensity = 0.25;
+        const maxIntensity  = 0.4;
+        const twinkleDuration = 5000 + Math.floor(Math.random() * 3000);
+        s.setAttribute('material', `color:#fff; emissive:#fff; emissiveIntensity:${baseIntensity}; shader:standard; fog:false`);
         s.setAttribute('animation__twinkle',
-          `property: components.material.material.emissiveIntensity; dir: alternate; loop: true; to: ${(0.15+Math.random()*0.4).toFixed(2)}; dur: ${1200+Math.floor(Math.random()*2400)}; easing: easeInOutSine`);
+          `property: components.material.material.emissiveIntensity; dir: alternate; loop: true; to: ${maxIntensity}; dur: ${twinkleDuration}; easing: easeInOutSine`);
         root.appendChild(s);
       }
     }
