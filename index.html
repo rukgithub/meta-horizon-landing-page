@@ -95,9 +95,10 @@
         s.setAttribute('radius', r);
         // Base emissive intensity is lower to reduce brightness.  The star
         // gradually brightens to a slightly higher intensity and then dims.
-        const baseIntensity = 0.25;
-        const maxIntensity  = 0.4;
-        const twinkleDuration = 5000 + Math.floor(Math.random() * 3000);
+        const baseIntensity = 0.28;
+        const maxIntensity  = 0.38;
+        // Slow the twinkle even further (8–12 seconds) for a more placid sky.
+        const twinkleDuration = 8000 + Math.floor(Math.random() * 4000);
         s.setAttribute('material', `color:#fff; emissive:#fff; emissiveIntensity:${baseIntensity}; shader:standard; fog:false`);
         s.setAttribute('animation__twinkle',
           `property: components.material.material.emissiveIntensity; dir: alternate; loop: true; to: ${maxIntensity}; dur: ${twinkleDuration}; easing: easeInOutSine`);
@@ -202,9 +203,10 @@
               material="metalness:0.1; roughness:0.9; emissive:#6a3a05; emissiveIntensity:0.2"
               animation="property: rotation; to: 0 360 0; dur: 42000; loop: true; easing: linear"></a-sphere>
 
-    <!-- Stjernehimmel: partikler + emissive sfærer for dybde -->
-    <a-entity particle-system="preset: stars; particleCount: 3000; color: #ffffff; size: 0.5; opacity: 0.9"></a-entity>
-    <a-entity star-spheres="count: 400; spread: 140"></a-entity>
+    <!-- Stjernehimmel: statiske emisive sfærer for dybde -->
+    <!-- Vi fjerner det dynamiske particle-system (som fik stjernerne til at bevæge sig hurtigt) og øger antallet
+         af emissive sfærer for at skabe et rigt, men roligt, stjernetæppe. -->
+    <a-entity star-spheres="count: 600; spread: 140"></a-entity>
 
     <!-- Stjerneskud -->
     <a-entity shooting-stars="rate: 5000; speed: 3800"></a-entity>
