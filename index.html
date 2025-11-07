@@ -5,273 +5,266 @@
   <title>Drømme‑univers • 360° galleri med rutsjebaner</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- A‑Frame core -->
-  <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
-  <!-- Lokomotion (smooth movement, keyboard/gamepad/touch) -->
-  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.6.0/dist/aframe-extras.min.js"></script>
-  <!-- Teleport/blink med rotation (thumbstick) -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
+  <!-- Pin A‑Frame og plugins til stabile versioner kompatible med Meta Quest -->
+  <script defer src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/aframe-extras@7.4.0/dist/aframe-extras.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
 
   <style>
-    html,body { margin:0; height:100%; background:#000; }
-    .a-enter-vr-button,.a-enter-ar-button { z-index: 999; }
+    html, body { margin: 0; height: 100%; background: #000; }
+    .a-enter-vr-button, .a-enter-ar-button { z-index: 999; }
   </style>
-
-  <script>
-  /*
-   * Galleri‑ring komponent
-   * Placerer 12 billeder i en cirkel omkring brugeren. Når der klikkes på
-   * bestemte billeder udløses en rutsjebaneoplevelse; ellers vises billedet
-   * i en lightbox. Indekset starter ved 0 (første billede i løkken).
-   */
-  AFRAME.registerComponent('gallery-ring', {
-    schema: {
-      radius: {type:'number', default: 14},
-      count:  {type:'int',    default: 12},
-      y:      {type:'number', default: 1.6},
-      width:  {type:'number', default: 3.0},
-      height: {type:'number', default: 2.0}
-    },
-    init: function(){
-      const d = this.data;
-      const root = this.el;
-      for (let i=0; i<d.count; i++){
-        const angle = (i/d.count) * Math.PI*2;
-        const x = d.radius * Math.sin(angle);
-        const z = d.radius * Math.cos(angle);
-        const rotY = -THREE.MathUtils.radToDeg(angle) + 180;
-        const n = i+1; // til id-valg i assets
-        // find asset id hvis eksisterer ellers fallback til img1
-        const asset = document.querySelector('#img'+n) ? '#img'+n : '#img1';
-        const plane = document.createElement('a-plane');
-        plane.setAttribute('width', d.width);
-        plane.setAttribute('height', d.height);
-        plane.setAttribute('position', `${x} ${d.y} ${z}`);
-        plane.setAttribute('rotation', `0 ${rotY} 0`);
-        plane.setAttribute('material', `src: ${asset}; side: double; shader: standard; metalness: 0; roughness: 0.85`);
-        plane.classList.add('clickable');
-        // lidt emissive glow ved hover
-        plane.setAttribute('animation__hoverOn', 'property: components.material.material.emissiveIntensity; startEvents: mouseenter; to: 0.25; dur: 160');
-        plane.setAttribute('animation__hoverOff','property: components.material.material.emissiveIntensity; startEvents: mouseleave;  to: 0.0;  dur: 200');
-        plane.setAttribute('animation__click',   'property: scale; startEvents: click; to: 1.05 1.05 1.05; dir: alternate; dur: 140');
-        // click handler
-        plane.addEventListener('click', () => {
-          const viewer = document.querySelector('#viewer');
-          // hvis første billede -> halloween rutsjebane
-          if (i === 0) {
-            startHalloweenSlide();
-          } else if (i === 1) {
-            // andet billede -> galakse rutsjebane
-            startGalaxySlide();
-          } else if (i === d.count-1) {
-            // sidste billede -> generel rutsjebane
-            startGeneralSlide();
-          } else {
-            // vis billede i viewer
-            viewer.setAttribute('material','src', asset);
-            viewer.emit('show');
-          }
-        });
-        root.appendChild(plane);
-      }
-    }
-  });
-
-  /* Statiske stjerner med langsom blink (8-12 sek). */
-  AFRAME.registerComponent('star-spheres', {
-    schema: {count:{default: 600}, spread:{default: 140}},
-    init: function(){
-      const {count, spread} = this.data;
-      for (let i=0; i<count; i++){
-        const s = document.createElement('a-sphere');
-        const x = (Math.random()-0.5) * spread;
-        const y = (Math.random()-0.3) * spread * 0.7 + 8;
-        const z = (Math.random()-0.5) * spread;
-        const r = Math.random()*0.12 + 0.01;
-        s.setAttribute('position', `${x} ${y} ${z}`);
-        s.setAttribute('radius', r);
-        s.setAttribute('material','color:#fff; emissive:#fff; emissiveIntensity:0.3; shader:standard; fog:false');
-        const target = (0.1 + Math.random()*0.3).toFixed(2);
-        const dur = 8000 + Math.floor(Math.random()*4000);
-        s.setAttribute('animation__twinkle', `property: components.material.material.emissiveIntensity; dir: alternate; loop: true; to: ${target}; dur: ${dur}; easing: easeInOutSine`);
-        this.el.appendChild(s);
-      }
-    }
-  });
-
-  /* Rutsjebane funktioner
-   * Hver funktion repositionerer kamera‑riggen og animerer den langs en straight linje. Kurver
-   * synliggøres via a-curve/a-tube i scenen. Viewer skjules mens man kører.
-   */
-  function startGeneralSlide() {
-    const rig = document.querySelector('#rig');
-    // skjul viewer hvis åben
-    document.querySelector('#viewer').emit('click');
-    // startposition oppe på banen
-    rig.setAttribute('position', '0 4 0');
-    // animation til bunden af banen
-    rig.setAttribute('animation__slide', 'property: position; to: 0 1.6 -25; dur: 9000; easing: easeInOutCubic');
-  }
-
-  function startGalaxySlide() {
-    const rig = document.querySelector('#rig');
-    document.querySelector('#viewer').emit('click');
-    // startposition for galaksebanen
-    rig.setAttribute('position', '0 4 0');
-    // længere tur med stjerner
-    rig.setAttribute('animation__slide', 'property: position; to: 0 1.6 -30; dur: 11000; easing: easeInOutCubic');
-  }
-
-  function startHalloweenSlide() {
-    const rig = document.querySelector('#rig');
-    document.querySelector('#viewer').emit('click');
-    // start ved toppen af halloween‑banen
-    rig.setAttribute('position', '0 4 0');
-    // en uhyggelig længere tur med twist
-    rig.setAttribute('animation__slide', 'property: position; to: 0 1.6 -35; dur: 12000; easing: easeInOutCubic');
-  }
-
-  /* Lightbox‑viewer komponent. Vis billedet når show‑event fyrer; klik for at lukke. */
-  AFRAME.registerComponent('image-viewer', {
-    init: function(){
-      const el = this.el;
-      el.setAttribute('visible','false');
-      el.setAttribute('scale','0.001 0.001 0.001');
-      el.addEventListener('show', () => {
-        el.setAttribute('visible','true');
-        el.setAttribute('animation__scaleIn','property: scale; to: 1 1 1; dur: 200; easing: easeOutQuad');
-        el.setAttribute('animation__fadeIn','property: material.opacity; to: 1; dur: 200');
-      });
-      el.addEventListener('click', () => {
-        el.setAttribute('animation__scaleOut','property: scale; to: 0.001 0.001 0.001; dur: 180; easing: easeInQuad');
-        el.setAttribute('animation__fadeOut','property: material.opacity; to: 0; dur: 180');
-        setTimeout(() => { el.setAttribute('visible','false'); }, 200);
-      });
-    }
-  });
-
-  /* Snap-turn for desktop brugere med Q/E eller piletaster */
-  AFRAME.registerComponent('snap-turn-keys', {
-    schema: {angle:{default: 22.5}},
-    init: function(){
-      const rig = this.el;
-      const a = this.data.angle;
-      window.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'q') rotate(-a);
-        if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'e') rotate(a);
-      });
-      function rotate(dy){
-        const r = rig.getAttribute('rotation');
-        rig.setAttribute('rotation', `${r.x} ${r.y + dy} ${r.z}`);
-      }
-    }
-  });
-  </script>
 </head>
-
 <body>
-  <a-scene
-    renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
-    background="color: #000000"
-    vr-mode-ui="enabled: true"
-    device-orientation-permission-ui="enabled: true">
+  <!-- Custom loader overlay to avoid A‑Frame's default spinner -->
+  <div id="boot" style="position:fixed;inset:0;background:#000;display:grid;place-items:center;color:#9cf;font:16px system-ui;z-index:9999">
+    <div>Indlæser univers…</div>
+  </div>
 
-    <!-- Assets: Billeder. Første to er halloween og rutsjebane, resten fallback velkommen -->
-    <a-assets timeout="15000">
-      <img id="img1" src="halloween.png" />
-      <img id="img2" src="rutsjebane.png" />
-      <img id="img3" src="velkommen.png" />
-      <img id="img4" src="velkommen.png" />
-      <img id="img5" src="velkommen.png" />
-      <img id="img6" src="velkommen.png" />
-      <img id="img7" src="velkommen.png" />
-      <img id="img8" src="velkommen.png" />
-      <img id="img9" src="velkommen.png" />
-      <img id="img10" src="velkommen.png" />
-      <img id="img11" src="velkommen.png" />
-      <img id="img12" src="velkommen.png" />
+  <a-scene loading-screen="enabled:false"
+           background="color: #000000"
+           renderer="antialias:false; powerPreference: high-performance; alpha:false; logarithmicDepthBuffer:true; precision:mediump"
+           xr="optionalFeatures: local-floor, bounded-floor, hand-tracking"
+           quest-tweaks>
+
+    <!-- Assets: 1-10 bruger velkommen, 11 halloween, 12 rutsjebane. CORS safe. -->
+    <a-assets timeout="3000">
+      <img id="img1"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img2"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img3"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img4"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img5"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img6"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img7"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img8"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img9"  src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img10" src="velkommen.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img11" src="halloween.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
+      <img id="img12" src="rutsjebane.png" crossorigin="anonymous" onerror="this.src='velkommen.png'" />
     </a-assets>
 
-    <!-- Lys -->
+    <!-- Ambient and directional light -->
     <a-entity light="type: ambient; intensity: 0.6"></a-entity>
     <a-entity light="type: directional; intensity: 0.35" position="2 4 -3"></a-entity>
 
-    <!-- Planeter i baggrunden -->
+    <!-- Background planets -->
     <a-sphere position="-8 3 -20" radius="3.5" color="#6bd1ff"
               material="metalness:0.1; roughness:0.9; emissive:#093a75; emissiveIntensity:0.25"></a-sphere>
     <a-sphere position="10 2 -28" radius="4.0" color="#f4a261"
               material="metalness:0.1; roughness:0.9; emissive:#6a3a05; emissiveIntensity:0.25"
               animation="property: rotation; to: 0 360 0; dur: 50000; loop: true; easing: linear"></a-sphere>
 
-    <!-- Stjerner -->
-    <a-entity star-spheres="count: 800; spread: 160"></a-entity>
+    <!-- Static star field -->
+    <a-entity star-spheres="count: 200; spread: 160"></a-entity>
 
-    <!-- Store jorden/gulv til at gå på -->
-    <a-plane position="0 0 -10" rotation="-90 0 0" width="200" height="200" color="#050708"
-             material="shader: standard; metalness: 0.1; roughness: 0.9"></a-plane>
+    <!-- Huge ground plane to walk on -->
+    <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200"
+             material="color:#060606; metalness:0; roughness:1"></a-plane>
 
-    <!-- Rutsjebane kurver (kun til visuelt formål). De faktiske animationer styres i JS functions ovenfor. -->
-    <!-- Generel rutsjebane (blå) -->
-    <a-curve id="curveGeneral">
-      <a-curve-point position="0 4 0"></a-curve-point>
-      <a-curve-point position="0 3 -6"></a-curve-point>
-      <a-curve-point position="1.5 2 -12"></a-curve-point>
-      <a-curve-point position="0 1.6 -25"></a-curve-point>
-    </a-curve>
-    <a-entity shadow="receive: false">
-      <a-tube radius="0.4" color="#4477cc" opacity="0.6" path="curveGeneral"></a-tube>
-    </a-entity>
-
-    <!-- Galakse rutsjebane (lilla/blå) -->
-    <a-curve id="curveGalaxy">
-      <a-curve-point position="0 4 0"></a-curve-point>
-      <a-curve-point position="0 3 -8"></a-curve-point>
-      <a-curve-point position="2 2 -16"></a-curve-point>
-      <a-curve-point position="0 1.6 -30"></a-curve-point>
-    </a-curve>
-    <a-entity>
-      <a-tube radius="0.45" color="#6a57c7" opacity="0.7" path="curveGalaxy"></a-tube>
-    </a-entity>
-
-    <!-- Halloween rutsjebane (orange) -->
-    <a-curve id="curveHalloween">
-      <a-curve-point position="0 4 0"></a-curve-point>
-      <a-curve-point position="0 3 -10"></a-curve-point>
-      <a-curve-point position="2 2 -20"></a-curve-point>
-      <a-curve-point position="0 1.6 -35"></a-curve-point>
-    </a-curve>
-    <a-entity>
-      <a-tube radius="0.5" color="#aa4422" opacity="0.7" path="curveHalloween"></a-tube>
-    </a-entity>
-
-    <!-- Galleri ring med 12 billeder -->
+    <!-- Gallery ring of 12 images -->
     <a-entity gallery-ring="radius: 14; y: 1.6; width: 3.2; height: 2.2"></a-entity>
 
-    <!-- Kamera‑rig med bevægelse og snap-turn -->
-    <a-entity id="rig" position="0 0 0" movement-controls snap-turn-keys>
+    <!-- Camera rig with movement and snap-turn; fallback for missing extras -->
+    <a-entity id="rig" position="0 0 0" movement-controls="fly: false" snap-turn-keys>
       <a-entity id="camera" camera position="0 1.6 0"
                 look-controls="pointerLockEnabled: true"
                 cursor="rayOrigin: mouse"
-                raycaster="objects: .clickable; far: 40">
+                raycaster="objects: .clickable; far: 50">
       </a-entity>
-      <!-- Laserkontroller -->
-      <a-entity laser-controls="hand: left"  raycaster="objects: .clickable; far: 40"></a-entity>
-      <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 40"></a-entity>
-      <!-- Blink teleport på Oculus Touch -->
+      <a-entity laser-controls="hand: left"  raycaster="objects: .clickable; far: 50"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 50"></a-entity>
       <a-entity oculus-touch-controls="hand: left"  blink-controls="cameraRig: #rig"></a-entity>
       <a-entity oculus-touch-controls="hand: right" blink-controls="cameraRig: #rig"></a-entity>
     </a-entity>
 
-    <!-- Viewer til at vise store billeder. Klik lukker den. -->
+    <!-- Image viewer for enlarged view; click to close -->
     <a-plane id="viewer" class="clickable" image-viewer
              position="0 1.6 -2.5" width="3.0" height="2.2"
              material="shader: standard; src: #img1; transparent: true; opacity: 0; side: double">
     </a-plane>
 
-    <!-- Instruktions‑tekst -->
+    <!-- Instruction text -->
     <a-entity position="0 3.2 -2.5"
       text="value: Bevæg dig med WASD/thumbstick • Klik på billederne for at se dem eller starte en rutsjebane!; align: center; width: 4.5; color: #E6E6E6; wrapCount: 50">
     </a-entity>
+
   </a-scene>
+
+  <!-- Debug log: logs errors at bottom-left. Safe to remove in production. -->
+  <div id="log" style="position:fixed;left:.5rem;bottom:.5rem;color:#7cf;font:12px monospace;z-index:9999"></div>
+
+  <!-- All custom scripts are loaded at the end to ensure A‑Frame is ready -->
+  <script defer>
+    // Hide the boot overlay when scene is ready or after timeout
+    window.addEventListener('DOMContentLoaded', () => {
+      const boot = document.getElementById('boot');
+      const scene = document.querySelector('a-scene');
+      function hide() { if (boot) boot.style.display = 'none'; }
+      if (scene) {
+        scene.addEventListener('loaded', hide);
+        scene.addEventListener('rendererinitialized', () => setTimeout(hide, 800));
+      }
+      setTimeout(hide, 8000);
+    });
+
+    // Simple error logger for debugging in headset
+    const logBox = document.getElementById('log');
+    function log(msg) {
+      if (logBox) {
+        logBox.textContent = (logBox.textContent + '\n' + msg).slice(-1000);
+      }
+    }
+    window.addEventListener('error', e => log('ERR: ' + e.message));
+    window.addEventListener('unhandledrejection', e => log('REJ: ' + (e.reason && e.reason.message ? e.reason.message : e.reason)));
+  </script>
+
+  <script defer>
+    // Quest-specific renderer tweaks and foveation
+    AFRAME.registerComponent('quest-tweaks', {
+      init: function() {
+        const r = this.el.renderer || this.el.sceneEl.renderer;
+        try { r.xr && r.xr.setFoveation && r.xr.setFoveation(1); } catch(e) {}
+        if (r) {
+          r.physicallyCorrectLights = false;
+        }
+      }
+    });
+
+    // Static stars for ambient background
+    AFRAME.registerComponent('star-spheres', {
+      schema: { count: {default: 200}, spread: {default: 140} },
+      init: function() {
+        const { count, spread } = this.data;
+        for (let i = 0; i < count; i++) {
+          const s = document.createElement('a-sphere');
+          const x = (Math.random() - 0.5) * spread;
+          const y = 8 + Math.random() * 40;
+          const z = (Math.random() - 0.5) * spread;
+          const r = Math.random() * 0.08 + 0.01;
+          s.setAttribute('position', `${x} ${y} ${z}`);
+          s.setAttribute('radius', r);
+          s.setAttribute('material', 'color:#fff; emissive:#fff; emissiveIntensity:0.28; shader:standard; fog:false');
+          this.el.appendChild(s);
+        }
+      }
+    });
+
+    // Snap-turn for desktop: rotate rig with Q/E or arrow keys
+    AFRAME.registerComponent('snap-turn-keys', {
+      schema: { angle: {default: 22.5} },
+      init: function() {
+        const rig = this.el;
+        const a = this.data.angle;
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'q') rotate(-a);
+          if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'e') rotate(a);
+        });
+        function rotate(dy) {
+          const r = rig.getAttribute('rotation');
+          rig.setAttribute('rotation', `${r.x} ${r.y + dy} ${r.z}`);
+        }
+      }
+    });
+
+    // Lightbox viewer: show/hide with scale and opacity animations
+    AFRAME.registerComponent('image-viewer', {
+      init: function() {
+        const el = this.el;
+        el.setAttribute('visible', 'false');
+        el.setAttribute('scale', '0.001 0.001 0.001');
+        el.addEventListener('show', () => {
+          el.setAttribute('visible', 'true');
+          el.setAttribute('animation__scaleIn', 'property: scale; to: 1 1 1; dur: 200; easing: easeOutQuad');
+          el.setAttribute('animation__fadeIn', 'property: material.opacity; to: 1; dur: 200');
+        });
+        el.addEventListener('click', () => {
+          el.setAttribute('animation__scaleOut', 'property: scale; to: 0.001 0.001 0.001; dur: 180; easing: easeInQuad');
+          el.setAttribute('animation__fadeOut', 'property: material.opacity; to: 0; dur: 180');
+          setTimeout(() => { el.setAttribute('visible', 'false'); }, 200);
+        });
+      }
+    });
+
+    // Gallery ring component: place images, handle clicks for slides
+    AFRAME.registerComponent('gallery-ring', {
+      schema: {
+        radius: {type: 'number', default: 14},
+        count:  {type: 'int',    default: 12},
+        y:      {type: 'number', default: 1.6},
+        width:  {type: 'number', default: 3.0},
+        height: {type: 'number', default: 2.0}
+      },
+      init: function() {
+        const d = this.data;
+        const root = this.el;
+        for (let i = 0; i < d.count; i++) {
+          const angle = (i / d.count) * Math.PI * 2;
+          const x = d.radius * Math.sin(angle);
+          const z = d.radius * Math.cos(angle);
+          const rotY = 180 - THREE.MathUtils.radToDeg(angle);
+          const n = i + 1;
+          const assetEl = document.querySelector('#img' + n);
+          const asset = assetEl ? '#img' + n : '#img1';
+          const p = document.createElement('a-plane');
+          p.setAttribute('width', d.width);
+          p.setAttribute('height', d.height);
+          p.setAttribute('position', `${x} ${d.y} ${z}`);
+          p.setAttribute('rotation', `0 ${rotY} 0`);
+          p.setAttribute('material', `src:${asset}; side:double; shader:standard; roughness:0.85`);
+          p.classList.add('clickable');
+          // hover & click animations
+          p.setAttribute('animation__hoverOn','property: components.material.material.emissiveIntensity; startEvents: mouseenter; to:0.35; dur:120');
+          p.setAttribute('animation__hoverOff','property: components.material.material.emissiveIntensity; startEvents: mouseleave; to:0; dur:140');
+          p.setAttribute('animation__click','property: scale; startEvents: click; to:1.08 1.08 1.08; dir:alternate; dur:140');
+          p.addEventListener('click', () => {
+            // If image 11 -> Halloween slide; if 12 -> Galaxy slide; else show viewer
+            if (n === 11) {
+              startHalloweenSlide();
+            } else if (n === 12) {
+              startGalaxySlide();
+            } else {
+              const viewer = document.querySelector('#viewer');
+              viewer.setAttribute('material', 'src', asset);
+              viewer.emit('show');
+            }
+          });
+          root.appendChild(p);
+        }
+      }
+    });
+
+    // Ride animation helper: simple segmented path with tilt animation
+    function rideAlong(key) {
+      const rig = document.getElementById('rig');
+      const rot = (key === 'galaxy') ? '-15' : (key === 'halloween' ? '15' : '0');
+      // reset position and rotation
+      rig.setAttribute('position', '0 0 0');
+      rig.setAttribute('rotation', `0 ${rot} 0`);
+      // remove previous animations
+      ['s1','s2','s3','s4','tilt'].forEach(k => rig.removeAttribute('animation__' + k));
+      // four segments for a smooth ride
+      rig.setAttribute('animation__s1','property: position; to: 0 3 -6; dur: 2000; easing: easeInOutSine');
+      rig.setAttribute('animation__s2','property: position; to: 2 1 -14; dur: 2000; easing: easeInOutSine; startEvents: animationcomplete__s1');
+      rig.setAttribute('animation__s3','property: position; to: -2 0 -22; dur: 2000; easing: easeInOutSine; startEvents: animationcomplete__s2');
+      rig.setAttribute('animation__s4','property: position; to: 0 1.6 -28; dur: 2000; easing: easeOutSine; startEvents: animationcomplete__s3');
+      // tilt effect
+      rig.setAttribute('animation__tilt','property: rotation; dir: alternate; loop: true; to: 3 ' + rot + ' 0; dur: 800; easing: easeInOutSine');
+      setTimeout(() => rig.removeAttribute('animation__tilt'), 8200);
+      // hide viewer
+      const viewer = document.getElementById('viewer');
+      if (viewer) viewer.setAttribute('visible','false');
+    }
+    function startHalloweenSlide() { rideAlong('halloween'); }
+    function startGalaxySlide() { rideAlong('galaxy'); }
+    function startGeneralSlide() { rideAlong('general'); }
+
+    // Fallback if movement-controls not present
+    window.addEventListener('DOMContentLoaded', () => {
+      const rig = document.getElementById('rig');
+      if (!AFRAME.components['movement-controls']) {
+        rig.setAttribute('wasd-controls', 'acceleration: 18');
+      }
+    });
+  </script>
 </body>
 </html>
