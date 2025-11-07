@@ -1,111 +1,229 @@
 <!DOCTYPE html>
-<html>
+<html lang="da">
 <head>
-  <meta charset="UTF-8">
-  <title>Meta Horizon Gallery - Universe Tour</title>
-  <!-- A-Frame library -->
-  <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+  <meta charset="utf-8" />
+  <title>Drømme‑univers • 360° galleri</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- A‑Frame (seneste stabile) -->
+  <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+
+  <!-- Lokomotion m.m. (movement-controls, gamepad/touch/keyboard) -->
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.6.0/dist/aframe-extras.min.js"></script>
+
+  <!-- Teleport/blink med rotation (thumbstick) -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe-blink-controls@0.4.3/dist/aframe-blink-controls.min.js"></script>
+
+  <!-- Partikler (stjerner/støv til stjerneskud) -->
+  <script src="https://unpkg.com/@c-frame/aframe-particle-system-component@1.2.0/dist/aframe-particle-system-component.min.js"></script>
+
+  <style>
+    html,body{margin:0;height:100%;background:#000}
+    /* Sørg for at VR/AR-knapper altid er ovenpå */
+    .a-enter-vr-button,.a-enter-ar-button{z-index:999}
+  </style>
+
+  <script>
+  /* ---------- 360° galleri-ring med klik ----------- */
+  AFRAME.registerComponent('gallery-ring', {
+    schema: {
+      radius: {type:'number', default: 9},
+      count:  {type:'int',    default: 12},
+      y:      {type:'number', default: 1.6},
+      width:  {type:'number', default: 3.0},
+      height: {type:'number', default: 2.0}
+    },
+    init: function(){
+      const d = this.data, root = this.el;
+      for (let i=0;i<d.count;i++){
+        const angle = (i/d.count) * Math.PI*2;
+        const x = d.radius * Math.sin(angle);
+        const z = d.radius * Math.cos(angle);
+        const rotY = -THREE.MathUtils.radToDeg(angle) + 180;
+        const n = i+1;
+        const asset = document.querySelector('#img'+n) ? '#img'+n : '#img1';
+
+        const p = document.createElement('a-plane');
+        p.setAttribute('width', d.width);
+        p.setAttribute('height', d.height);
+        p.setAttribute('position', `${x} ${d.y} ${z}`);
+        p.setAttribute('rotation', `0 ${rotY} 0`);
+        p.setAttribute('material',
+          `src: ${asset}; side: double; shader: standard; metalness: 0; roughness: 0.85`);
+        p.classList.add('clickable');
+
+        // let hover glow + lille “pop” ved klik
+        p.setAttribute('animation__hoverOn',
+          'property: components.material.material.emissiveIntensity; startEvents: mouseenter; to: 0.35; dur: 120');
+        p.setAttribute('animation__hoverOff',
+          'property: components.material.material.emissiveIntensity; startEvents: mouseleave;  to: 0.0;  dur: 140');
+        p.setAttribute('animation__click',
+          'property: scale; startEvents: click; to: 1.08 1.08 1.08; dir: alternate; dur: 140');
+
+        p.addEventListener('click', () => {
+          const viewer = document.querySelector('#viewer');
+          viewer.setAttribute('material', 'src', asset);
+          viewer.emit('show');
+        });
+        root.appendChild(p);
+      }
+    }
+  });
+
+  /* --------- Emissive stjerne-sfærer for dybde -------- */
+  AFRAME.registerComponent('star-spheres', {
+    schema: {count:{default: 600}, spread:{default: 160}},
+    init: function(){
+      const spread = this.data.spread, root = this.el;
+      for (let i=0;i<this.data.count;i++){
+        const s = document.createElement('a-sphere');
+        const x=(Math.random()-0.5)*spread;
+        const y=(Math.random()-0.3)*spread*0.7 + 8; // bias over horisonten
+        const z=(Math.random()-0.5)*spread;
+        const r = Math.random()*0.12 + 0.01;
+        s.setAttribute('position',`${x} ${y} ${z}`);
+        s.setAttribute('radius', r);
+        s.setAttribute('material','color:#fff; emissive:#fff; emissiveIntensity:0.35; shader:standard; fog:false');
+        s.setAttribute('animation__twinkle',
+          `property: components.material.material.emissiveIntensity; dir: alternate; loop: true; to: ${(0.15+Math.random()*0.4).toFixed(2)}; dur: ${1200+Math.floor(Math.random()*2400)}; easing: easeInOutSine`);
+        root.appendChild(s);
+      }
+    }
+  });
+
+  /* ------------- Periodiske stjerneskud --------------- */
+  AFRAME.registerComponent('shooting-stars', {
+    schema: {rate:{default: 5000}, speed:{default: 3600}},
+    init: function(){ this.timer=setInterval(()=>this.spawn(), this.data.rate); },
+    remove: function(){ clearInterval(this.timer); },
+    spawn: function(){
+      const el = document.createElement('a-entity');
+      const sx = -15 - Math.random()*10, sy = 6 + Math.random()*6, sz = -25 - Math.random()*10;
+      const ex =  15 + Math.random()*10, ey = sy + (Math.random()*2 - 1), ez = sz - 15 - Math.random()*10;
+
+      const head = document.createElement('a-sphere');
+      head.setAttribute('radius','0.12');
+      head.setAttribute('position', `${sx} ${sy} ${sz}`);
+      head.setAttribute('material','color:#fff; emissive:#fff; emissiveIntensity:1; shader:standard; fog:false');
+      head.setAttribute('animation__move', `property: position; to: ${ex} ${ey} ${ez}; dur: ${this.data.speed}; easing: linear`);
+      head.setAttribute('animation__fade', `property: material.emissiveIntensity; to: 0; dur: ${this.data.speed}; easing: linear`);
+
+      const trail = document.createElement('a-entity');
+      trail.setAttribute('particle-system','preset: dust; color: #ffffff, #fddda0; particleCount: 120; size: 0.03; opacity: 0.65');
+      trail.setAttribute('position', `${sx} ${sy} ${sz}`);
+      trail.setAttribute('animation__move', `property: position; to: ${ex} ${ey} ${ez}; dur: ${this.data.speed}; easing: linear`);
+
+      el.appendChild(head); el.appendChild(trail);
+      setTimeout(()=>el.remove(), this.data.speed + 400);
+      this.el.appendChild(el);
+    }
+  });
+
+  /* ----------------- Billedfremviser ------------------- */
+  AFRAME.registerComponent('image-viewer', {
+    init: function(){
+      const el = this.el;
+      el.setAttribute('visible','false');
+      el.setAttribute('scale','0.001 0.001 0.001');
+      el.addEventListener('show', ()=>{
+        el.setAttribute('visible','true');
+        el.setAttribute('animation__scaleIn','property: scale; to: 1 1 1; dur: 180; easing: easeOutQuad');
+        el.setAttribute('animation__fadeIn','property: material.opacity; to: 1; dur: 160');
+      });
+      el.addEventListener('click', ()=>{
+        el.setAttribute('animation__scaleOut','property: scale; to: 0.001 0.001 0.001; dur: 140; easing: easeInQuad');
+        el.setAttribute('animation__fadeOut','property: material.opacity; to: 0; dur: 140');
+        setTimeout(()=>el.setAttribute('visible','false'), 150);
+      });
+    }
+  });
+
+  /* ------ Snap‑turn på Q/E el. piletaster (desktop) ---- */
+  AFRAME.registerComponent('snap-turn-keys', {
+    schema: {angle:{default: 22.5}},
+    init: function(){
+      const rig = this.el, a=this.data.angle;
+      window.addEventListener('keydown', (e)=>{
+        if (e.key==='ArrowLeft'||e.key.toLowerCase()==='q') rot(-a);
+        if (e.key==='ArrowRight'||e.key.toLowerCase()==='e') rot(a);
+      });
+      function rot(dy){ const r=rig.getAttribute('rotation'); rig.setAttribute('rotation', `${r.x} ${r.y+dy} ${r.z}`); }
+    }
+  });
+  </script>
 </head>
+
 <body>
-  <!-- Main scene for VR gallery -->
-  <a-scene background="color: #000000">
-    <!-- Assets: load the same image for all placeholders -->
-    <a-assets>
-      <img id="img1" src="velkommen.png">
+  <a-scene
+    renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true"
+    background="color: #000000"
+    vr-mode-ui="enabled: true"
+    device-orientation-permission-ui="enabled: true">
+
+    <!-- BILLEDER: læg dine endelige filer ved siden af index.html og ret disse src’er -->
+    <a-assets timeout="10000">
+      <img id="img1"  src="velkommen.png">
+      <img id="img2"  src="velkommen.png">
+      <img id="img3"  src="velkommen.png">
+      <img id="img4"  src="velkommen.png">
+      <img id="img5"  src="velkommen.png">
+      <img id="img6"  src="velkommen.png">
+      <img id="img7"  src="velkommen.png">
+      <img id="img8"  src="velkommen.png">
+      <img id="img9"  src="velkommen.png">
+      <img id="img10" src="velkommen.png">
+      <img id="img11" src="velkommen.png">
+      <img id="img12" src="velkommen.png">
     </a-assets>
 
-    <!-- Star field component definition -->
-    <script>
-      // Create a simple star field by adding spheres at random positions.
-      AFRAME.registerComponent('star-field', {
-        init: function () {
-          const sceneEl = this.el;
-          const count = 200;
-          for (let i = 0; i < count; i++) {
-            const star = document.createElement('a-sphere');
-            const space = 60;
-            const x = (Math.random() - 0.5) * space;
-            const y = (Math.random() - 0.5) * space;
-            const z = (Math.random() - 0.5) * space;
-            star.setAttribute('position', {x: x, y: y, z: z});
-            const size = Math.random() * 0.15 + 0.02;
-            star.setAttribute('radius', size);
-            star.setAttribute('material', {color: '#FFFFFF', shader: 'flat', opacity: 0.8});
-            sceneEl.appendChild(star);
-          }
-        }
-      });
+    <!-- Lys -->
+    <a-entity light="type: ambient; intensity: 0.6"></a-entity>
+    <a-entity light="type: directional; intensity: 0.35" position="2 4 -3"></a-entity>
 
-      // Component to create twelve image planes around a circle and add click interaction.
-      AFRAME.registerComponent('gallery-setup', {
-        init: function () {
-          const sceneEl = this.el;
-          const total = 12;
-          const radius = 8;
-          for (let i = 0; i < total; i++) {
-            const angle = (i / total) * Math.PI * 2;
-            const x = radius * Math.sin(angle);
-            const z = radius * Math.cos(angle);
-            const y = 1.5;
-            const plane = document.createElement('a-plane');
-            plane.setAttribute('position', {x: x, y: y, z: z});
-            // Rotate the plane to face the center.
-            const rotationY = -angle * 180 / Math.PI + 180;
-            plane.setAttribute('rotation', {x: 0, y: rotationY, z: 0});
-            plane.setAttribute('width', 4);
-            plane.setAttribute('height', 3);
-            plane.setAttribute('material', {src: '#img1', side: 'double', transparent: false});
-            plane.classList.add('clickable');
-            // Simple click interaction: briefly scale image when clicked.
-            plane.addEventListener('click', function () {
-              plane.emit('scaleup');
-            });
-            plane.setAttribute('animation__scaleup', {
-              property: 'scale',
-              startEvents: 'scaleup',
-              to: '1.3 1.3 1.3',
-              dur: 200,
-              easing: 'easeOutQuad',
-              dir: 'alternate'
-            });
-            sceneEl.appendChild(plane);
-          }
-        }
-      });
-    </script>
+    <!-- Planeter -->
+    <a-sphere position="-6 3 -14" radius="2.7" color="#6bd1ff"
+              material="metalness:0.1; roughness:0.9; emissive:#093a75; emissiveIntensity:0.25"></a-sphere>
+    <a-sphere position="9 2 -18" radius="3.4" color="#f4a261"
+              material="metalness:0.1; roughness:0.9; emissive:#6a3a05; emissiveIntensity:0.2"
+              animation="property: rotation; to: 0 360 0; dur: 42000; loop: true; easing: linear"></a-sphere>
 
-    <!-- Add the star field to the scene -->
-    <a-entity star-field></a-entity>
+    <!-- Stjernehimmel: partikler + emissive sfærer for dybde -->
+    <a-entity particle-system="preset: stars; particleCount: 3000; color: #ffffff; size: 0.5; opacity: 0.9"></a-entity>
+    <a-entity star-spheres="count: 400; spread: 140"></a-entity>
 
-    <!-- Add a simple planet -->
-    <a-sphere position="0 3 -15" radius="3" color="#88c0ff" material="shader: standard; roughness: 0.8;"></a-sphere>
+    <!-- Stjerneskud -->
+    <a-entity shooting-stars="rate: 5000; speed: 3800"></a-entity>
 
-    <!-- Shooting star: animated small sphere that moves across the sky -->
-    <a-sphere id="shootingStar" position="-10 6 -20" radius="0.15" color="#ffffff"></a-sphere>
-    <a-animation
-      attribute="position"
-      dur="7000"
-      fill="forwards"
-      repeat="indefinite"
-      easing="linear"
-      to="10 8 -30"
-      direction="alternate"
-      ></a-animation>
+    <!-- 12 billeder i ring -->
+    <a-entity id="gallery" gallery-ring="radius: 9; y: 1.6; width: 3; height: 2"></a-entity>
 
-    <!-- Set up the gallery with 12 placeholders -->
-    <a-entity gallery-setup></a-entity>
-
-    <!-- Camera rig: includes camera, controls, and cursor -->
-    <a-entity id="cameraRig" position="0 1.6 0">
-      <a-entity
-        camera
-        look-controls
-        wasd-controls
-        raycaster="objects: .clickable"
-        cursor="rayOrigin: mouse; fuse: false; maxDistance: 50"
-        >
+    <!-- Kamera‑rig m. kvalitet-lokomotion -->
+    <a-entity id="rig" position="0 0 0" movement-controls snap-turn-keys>
+      <a-entity id="camera" camera position="0 1.6 0"
+                look-controls="pointerLockEnabled: true"
+                cursor="rayOrigin: mouse"
+                raycaster="objects: .clickable; far: 35">
       </a-entity>
+
+      <!-- Lasere på controllere (platforms-kompatibel) -->
+      <a-entity laser-controls="hand: left"  raycaster="objects: .clickable; far: 35"></a-entity>
+      <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 35"></a-entity>
+
+      <!-- Blink‑teleport med rotation (Quest thumbstick) -->
+      <a-entity oculus-touch-controls="hand: left"  blink-controls="cameraRig: #rig"></a-entity>
+      <a-entity oculus-touch-controls="hand: right" blink-controls="cameraRig: #rig"></a-entity>
     </a-entity>
+
+    <!-- Lightbox‑viewer (klik for at lukke) -->
+    <a-plane id="viewer" class="clickable" image-viewer
+             position="0 1.6 -2.2" width="2.6" height="1.8"
+             material="shader: standard; src: #img1; transparent: true; opacity: 0; side: double"></a-plane>
+
+    <!-- Hjælpetekst -->
+    <a-entity position="0 2.9 -2.2"
+      text="value: WASD/Thumbstick = bevægelse • Laser/mus = klik • Teleport: hold/tilt thumbstick; align: center; width: 2.5; color: #E6E6E6; wrapCount: 36">
+    </a-entity>
+
   </a-scene>
 </body>
 </html>
